@@ -1,1 +1,1 @@
-# ArtetaisJolJang
+# 석사학위 R 코드와 텍스트 데이터 모음
