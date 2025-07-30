@@ -154,7 +154,7 @@ node_frequency <- pairwise_counts %>%
 
 # 그래프 데이터 생성
 graph_pair <- pairwise_counts %>%
-  filter(n >= 80) %>%
+  filter(n >= 75) %>%
   as_tbl_graph(directed = FALSE) %>%
   activate(nodes) %>%
   left_join(node_frequency, by = c("name" = "item1")) %>%
@@ -170,7 +170,7 @@ ggraph(graph_pair, layout = "fr") +
   scale_size(range = c(3, 15), guide = "none") +  # 노드 크기 조정 (빈도에 따라)
   scale_color_gradient(low = "yellow", high = "red") +  # 색상 스케일 설정
   geom_node_text(aes(label = name), repel = TRUE, size = 4, fontface = "bold") +  # 노드 텍스트 크기 및 굵기 조정
-  labs(title = "Pairwise Co-occurrence Network (Moratorium, n>=80)") +  # 범례 없이 제목만 표시
+  labs(title = "Pairwise Co-occurrence Network (Moratorium, n>=75)") +  # 범례 없이 제목만 표시
   theme_void()  # 테마 설정
 
 
