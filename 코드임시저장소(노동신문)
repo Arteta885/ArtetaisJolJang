@@ -1,0 +1,82 @@
+(async () => {
+
+    let startPage = 1;
+    let endPage = 8;
+
+    let baseUrl = location.origin + location.pathname + location.search;
+
+    let results = [];
+
+    // ✔ 상세 페이지 크롤링
+    async function getDetail(uid) {
+        let url = `https://unibook.unikorea.go.kr/material/view?uid=${uid}`;
+        
+        let res = await fetch(url);
+        let html = await res.text();
+        
+        let parser = new DOMParser();
+        let doc = parser.parseFromString(html, "text/html");
+
+        function getValue(label) {
+            let dts = Array.from(doc.querySelectorAll("dt"));
+
+            let target = dts.find(el => el.innerText.trim() === label);
+
+            if (!target) return null;
+
+            let dd = target.nextElementSibling;
+
+            return dd ? dd.innerText.trim() : null;
+        }
+
+        return {
+            uid: uid,
+            title: getValue("주기사명"),
+            author: getValue("저자"),
+            book: getValue("서명"),
+            issue: getValue("권호"),
+            publisher: getValue("발행처"),
+            date: getValue("발행일자"),
+            page: getValue("페이지")
+        };
+    }
+
+    // ✔ uid 수집
+    for (let page = startPage; page <= endPage; page++) {
+
+        console.log(`페이지 ${page}`);
+
+        let url = baseUrl.replace(/page=\d+/, "page=" + page);
+
+        let res = await fetch(url);
+        let html = await res.text();
+
+        let parser = new DOMParser();
+        let doc = parser.parseFromString(html, "text/html");
+
+        let uids = [...doc.querySelectorAll("a[href*='uid=']")]
+            .map(el => el.href.split("uid=")[1]);
+
+        for (let uid of uids) {
+            let data = await getDetail(uid);
+            results.push(data);
+            console.log(data);
+        }
+    }
+
+    // ✔ CSV
+    let csv = "uid,title,author,book,issue,publisher,date,page\n";
+
+    results.forEach(r => {
+        csv += `"${r.uid}","${r.title}","${r.author}","${r.book}","${r.issue}","${r.publisher}","${r.date}","${r.page}"\n`;
+    });
+
+    let blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    let a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "data.csv";
+    a.click();
+
+    console.log("완료");
+
+})();
