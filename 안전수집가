@@ -3,9 +3,10 @@
     let startPage = 1;
     let endPage = 9999;
 
+    let startBatch = 3;    // ✔ 이어서 저장할 batch 번호
     let batchSize = 100;
     let batch = [];
-    let batchCount = 0;
+    let batchCount = startBatch - 1;
 
     let baseUrl = location.origin + location.pathname + location.search;
 
