@@ -1,0 +1,137 @@
+(async () => {
+
+    let startPage = 1;
+    let endPage = 9999;
+
+    let batchSize = 100;
+    let batch = [];
+    let batchCount = 0;
+
+    let baseUrl = location.origin + location.pathname + location.search;
+
+    // ✔ 딜레이 함수
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // ✔ 안전 fetch (재시도 포함)
+    async function safeFetch(url, retries = 3) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                let res = await fetch(url);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return await res.text();
+            } catch (e) {
+                console.log(`⚠️ fetch 실패 → 재시도 (${i + 1}/${retries})`);
+                await sleep(2000);
+            }
+        }
+        console.log("❌ 최종 실패:", url);
+        return null;
+    }
+
+    // ✔ CSV 저장
+    function downloadCSV(data, index) {
+        let csv = "uid,title,author,book,issue,publisher,date,page\n";
+
+        data.forEach(r => {
+            csv += `"${r.uid}","${r.title}","${r.author}","${r.book}","${r.issue}","${r.publisher}","${r.date}","${r.page}"\n`;
+        });
+
+        let blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        let a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `data_batch_${index}.csv`;
+        a.click();
+    }
+
+    // ✔ 상세 수집
+    async function getDetail(uid) {
+        let url = `https://unibook.unikorea.go.kr/material/view?uid=${uid}`;
+        let html = await safeFetch(url);
+        if (!html) return null;
+
+        let doc = new DOMParser().parseFromString(html, "text/html");
+
+        function getValue(label) {
+            let dts = [...doc.querySelectorAll("dt")];
+            let target = dts.find(el => el.innerText.trim() === label);
+            if (!target) return null;
+            let dd = target.nextElementSibling;
+            return dd ? dd.innerText.trim() : null;
+        }
+
+        return {
+            uid: uid,
+            title: getValue("주기사명"),
+            author: getValue("저자"),
+            book: getValue("서명"),
+            issue: getValue("권호"),
+            publisher: getValue("발행처"),
+            date: getValue("발행일자"),
+            page: getValue("페이지")
+        };
+    }
+
+    let seenUIDs = new Set();
+
+    for (let page = startPage; page <= endPage; page++) {
+
+        console.log(`📄 페이지 ${page}`);
+
+        let url = baseUrl.replace(/page=\d+/, "page=" + page);
+
+        let html = await safeFetch(url);
+        if (!html) continue;
+
+        // ✔ 페이지 요청 후 딜레이 (추가된 핵심 부분)
+        await sleep(1500);
+
+        let doc = new DOMParser().parseFromString(html, "text/html");
+
+        let uids = [...new Set(
+            [...doc.querySelectorAll("a[href*='uid=']")]
+                .map(el => el.href.split("uid=")[1])
+        )];
+
+        for (let uid of uids) {
+
+            if (seenUIDs.has(uid)) continue;
+            seenUIDs.add(uid);
+
+            let data = await getDetail(uid);
+
+            if (data) {
+                batch.push(data);
+                console.log(`✔ (${batch.length}/${batchSize})`, data.uid);
+            }
+
+            // ✔ 100개 단위 저장
+            if (batch.length >= batchSize) {
+                batchCount++;
+                downloadCSV(batch, batchCount);
+                batch = [];
+
+                console.log(`💾 batch ${batchCount} 저장 완료`);
+
+                await sleep(5000); // 저장 후 충분한 휴식
+            }
+
+            // ✔ 상세 요청 간 딜레이
+            await sleep(1200);
+        }
+
+        // ✔ 페이지 간 딜레이
+        await sleep(2500);
+    }
+
+    // ✔ 남은 데이터 저장
+    if (batch.length > 0) {
+        batchCount++;
+        downloadCSV(batch, batchCount);
+        console.log(`💾 마지막 batch 저장 완료`);
+    }
+
+    console.log("✅ 전체 완료");
+
+})();
